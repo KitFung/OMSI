@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Policy(object):
     # Select Max
     def choose(self, agent):
@@ -35,8 +36,6 @@ class NonStationaryBanditAgent(object):
         self.disc_cnt = np.zeros(n_option)
         self.indices = np.zeros(n_option)
 
-
-
     def add_option(self, option_name):
         if len(self.avail_idx) == 0:
             print("Cannot add option since no place leave")
@@ -44,7 +43,6 @@ class NonStationaryBanditAgent(object):
         idx = self.avail_idx.pop()
         self.option_name_map[option_name] = idx
         return True
-
 
     def kick_option(self, option_name):
         target = self.option_name_map[option_name]
@@ -57,16 +55,19 @@ class NonStationaryBanditAgent(object):
         self.avail_idx.append(target)
 
     def choose(self):
-        self.policy.choose(self)
+        return self.policy.choose(self)
 
     def observe(self, name, reward):
         target = self.option_name_map[name]
         self.cum_reward[target] += reward
-        self.pull_cnt[target] += 1
+        self.pull_cnt[target] += 1.0
         self.step += 1
         self.disc_cum_reward[:] *= self.discount_factor
         self.disc_cum_reward[target] += reward
         self.disc_cnt[:] *= self.discount_factor
-        self.disc_cnt[target] += 1
+        self.disc_cnt[target] += 1.0
         self.indices = self.disc_cum_reward / self.disc_cnt + 2 * np.sqrt(
             self.confidence_scale * np.log(self.disc_cnt.sum()) / self.disc_cnt)
+
+    def initialized(self):
+        return len(self.pull_cnt[self.pull_cnt == 0]) == 0

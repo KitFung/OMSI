@@ -30,6 +30,8 @@ expected_accuracy:
     - 0.78
     ...
 """
+
+
 class OMSILoader(object):
     def __init__(self):
         self.conf = None
@@ -48,9 +50,12 @@ class OMSILoader(object):
             self.conf['models'],
             self.conf['models_class'],
             self.conf['cluster_center'])
-        
+
         for k, v in self.conf['expected_accuracy'].items():
             self.acc[k] = np.array(v)
+
+    def model_cluster(self):
+        return self.conf['model_cluster']
 
     def model_store(self):
         return self.store

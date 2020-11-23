@@ -114,6 +114,7 @@ PSeq = {
     'PSeq3': PSeq3
 }
 
+
 def get_indices(dataset, label):
     indices = []
     for i in range(len(dataset.targets)):
@@ -121,13 +122,22 @@ def get_indices(dataset, label):
             indices.append(i)
     return indices
 
+
 def raw_loaders(dataset_dir):
-    raw_dataset = datasets.ImageFolder(dataset_dir, transform=transforms.ToTensor())
+    preprocess = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
+                             0.229, 0.224, 0.225]),
+    ])
+    raw_dataset = datasets.ImageFolder(dataset_dir, transform=preprocess)
     data_loaders = [
         iter(data.DataLoader(data.Subset(raw_dataset, get_indices(raw_dataset, i)),
-        batch_size=1, shuffle=True))
+                             batch_size=1, shuffle=True))
         for i in TargetLabels]
     return data_loaders
+
 
 def load_with_probability_seq(seq_name, dataset_dir):
     seq = PSeq[seq_name]
@@ -162,6 +172,7 @@ def load_with_probability_seq(seq_name, dataset_dir):
         if out is None:
             raise "Not enough data"
         yield out
+
 
 if __name__ == '__main__':
     data_path = './tiny-imagenet-200/train'
