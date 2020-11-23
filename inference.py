@@ -20,6 +20,7 @@ import profiling
 # class_idx = json.load(open("labels.json"))
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
+
 def allocate_buffers(model_engine):
     bindings = []
     inputs = []
@@ -64,10 +65,17 @@ def cost_fn(predict, predict_softmax, expected_accuracy, image):
         return None
     return expected_accuracy[predict]
 
-# Using the teacher model in server to cost
+"""
+Using the teacher model in server to cost
+"""
 def cost_fn_softmax(predict, predict_softmax, expected_accuracy, image):
     # TorchServe
     return 0
+
+
+def cost_combined(predict, predict_softmax, expected_accuracy, image):
+    return 0
+
 
 def main():
     K = 3
@@ -110,13 +118,15 @@ def main():
         target_model = k_models[target_idx]
         target_context = contexts[target_idx]
         inputs[0]["host"] = img
-        out, ms = do_inference(target_context, bindings, inputs, outputs, stream)
+        out, ms = do_inference(target_context, bindings,
+                               inputs, outputs, stream)
 
-        # Convert the 1000 dimension output to 
+        # Convert the 1000 dimension output to
         trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
         label = trt_output.argmax(dim=0).numpy()
 
-        cost = cost_fn(label, trt_output, omsi.expected_accuracy(target_model), img)
+        cost = cost_fn(label, trt_output,
+                       omsi.expected_accuracy(target_model), img)
         # Unavailable to evaluate
         if cost is None:
             continue
@@ -126,12 +136,14 @@ def main():
 
         if not profiler.model_acceptable(target_model):
             agent.kick_option(target_model)
-            new_target = store.kick_and_next(target_model, profiler.cluster_rank())
+            new_target = store.kick_and_next(
+                target_model, profiler.cluster_rank())
             agent.add_option(new_target)
 
         if agent.initialized() and profiler.explore_enough(target_model):
             agent.kick_option(target_model)
-            new_target = store.swapoff_and_next(target_model, profiler.cluster_rank())
+            new_target = store.swapoff_and_next(
+                target_model, profiler.cluster_rank())
             agent.add_option(new_target)
 
     torch.cuda.empty_cache()
