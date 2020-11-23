@@ -49,7 +49,7 @@ class OMSILoader(object):
             self.conf['models_class'],
             self.conf['cluster_center'])
         
-        for k, v in self.conf['expected_accuracy']:
+        for k, v in self.conf['expected_accuracy'].items():
             self.acc[k] = np.array(v)
 
     def model_store(self):
@@ -69,5 +69,7 @@ class OMSILoader(object):
 if __name__ == '__main__':
     loader = OMSILoader()
     loader.load('./omsi_conf.yaml')
-    import pdb; pdb.set_trace()
-    pass
+    print(loader.expected_accuracy('modela'))
+
+    store = loader.model_store()
+    print(store.select_top_k(3))

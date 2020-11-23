@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 import json
 
+from bandit import NonStationaryBanditAgent, Policy
 import omsi_loader
 import load_models
 import dataloader
@@ -19,6 +20,7 @@ import profiling
 class_idx = json.load(open("labels.json"))
 onnx_file_path = 'vgg.onnx'
 engine_file_path = 'vgg.trt'
+TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 
 # def get_image(input_image_path):
@@ -107,14 +109,14 @@ def do_inference(context, bindings, inputs, outputs, stream):
 def main():
     K = 3
     WINDOW_SIZE = 1000
+    OMSI_CONF = './omsi_conf.yaml'
 
     # Step 1: Load the config: List of models, expected accuracy on each class, model distance
     #     Step 1.1: Init to Select K first cand models
     osmi = omsi_loader.OMSILoader()
+    osmi.load(OMSI_CONF)
     store = osmi.model_store()
-    selector = load_models.ModelsSelector()
-    k_models = selector.select_top_k(store.model_list(), K)
-    k_names = [store.model_list()]
+    k_models = store.select_top_k(K)
 
     agent = NonStationaryBanditAgent(Policy(), K, k_names)
 
