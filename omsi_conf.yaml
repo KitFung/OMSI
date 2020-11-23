@@ -1,0 +1,59 @@
+models:
+    modela: ./onnx_dir/modela.onnx
+    modelb: ./onnx_dir/modelb.onnx
+    modelc: ./onnx_dir/modelc.onnx
+    modeld: ./onnx_dir/modeld.onnx
+models_class:
+    modela: 1
+    modelb: 1
+    modelc: 2
+    modeld: 3
+cluster_center:
+    1: modela
+    2: modelc
+    3: modeld
+expected_accuracy:
+    modela: # array of size 10
+    - 0.89
+    - 0.99
+    - 0.78
+    - 0.39
+    - 0.89
+    - 0.99
+    - 0.78
+    - 0.39
+    - 0.89
+    - 0.99
+    modelb: # array of size 10
+    - 0.89
+    - 0.99
+    - 0.78
+    - 0.39
+    - 0.89
+    - 0.99
+    - 0.78
+    - 0.39
+    - 0.89
+    - 0.99
+    modelc: # array of size 10
+    - 0.89
+    - 0.99
+    - 0.78
+    - 0.39
+    - 0.89
+    - 0.99
+    - 0.78
+    - 0.39
+    - 0.89
+    - 0.99
+    modeld: # array of size 10
+    - 0.89
+    - 0.99
+    - 0.78
+    - 0.39
+    - 0.89
+    - 0.99
+    - 0.78
+    - 0.39
+    - 0.89
+    - 0.99

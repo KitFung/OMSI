@@ -19,7 +19,6 @@ import profiling
 class_idx = json.load(open("labels.json"))
 onnx_file_path = 'vgg.onnx'
 engine_file_path = 'vgg.trt'
-TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 
 # def get_image(input_image_path):
