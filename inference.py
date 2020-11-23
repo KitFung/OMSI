@@ -58,24 +58,33 @@ def do_inference(context, bindings, inputs, outputs, stream):
     return [output["host"] for output in outputs], (end - start) * 1e-6
 
 
-# simply return the expected acc
-def cost_fn(predict, predict_softmax, expected_accuracy, image):
+"""
+Using the weighted accuracy of the expected accuracy as reward
+"""
+def reward_fn_distri(predict, expected_accuracy):
     n_label = len(expected_accuracy)
     if predict >= n_label:
         return None
     return expected_accuracy[predict]
 
 """
-Using the teacher model in server to cost
+Using the teacher model in server to cost. Using the statiscal closeness of the output as reward
 """
-def cost_fn_softmax(predict, predict_softmax, expected_accuracy, image):
+def reward_fn_teacher(predict, predict_softmax, expected_accuracy, image):
     # TorchServe
     return 0
 
-
-def cost_combined(predict, predict_softmax, expected_accuracy, image):
+def regert_fn(predict):
     return 0
 
+def reward_fn(predict):
+    return 0
+
+def reward_fn_regert((predict, predict_softmax, expected_accuracy, image):
+    return 1.0 / (regert_fn(predict) + 0.001)
+
+def reward_fn_reward((predict, predict_softmax, expected_accuracy, image):
+    return reward_fn(predict)
 
 def main():
     K = 3
@@ -125,22 +134,20 @@ def main():
         trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
         label = trt_output.argmax(dim=0).numpy()
 
-        cost = cost_fn(label, trt_output,
-                       omsi.expected_accuracy(target_model), img)
+        reward = reward_fn_distri(label, omsi.expected_accuracy(target_model))
         # Unavailable to evaluate
-        if cost is None:
+        if reward is None:
             continue
 
-        agent.observe(target_model, cost)
-        profiler.profile_once(target_model, cost, ms)
+        agent.observe(target_model, reward)
+        profiler.profile_once(target_model, reward, ms)
 
         if not profiler.model_acceptable(target_model):
             agent.kick_option(target_model)
             new_target = store.kick_and_next(
                 target_model, profiler.cluster_rank())
             agent.add_option(new_target)
-
-        if agent.initialized() and profiler.explore_enough(target_model):
+        elif agent.initialized() and profiler.explore_enough(target_model):
             agent.kick_option(target_model)
             new_target = store.swapoff_and_next(
                 target_model, profiler.cluster_rank())
