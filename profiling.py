@@ -11,6 +11,7 @@ class Profiler(object):
         self.total_score = {}
         self.total_ms = {}
         self.invalid = set()
+        self.selected_record = []
 
         self.model_cluster = model_cluster
         self.threshold_ms = 1000.0 / required_fps
@@ -44,6 +45,7 @@ class Profiler(object):
         self.invalid.add(name)
 
     def profile_once(self, name, score, ms):
+        self.selected_record.append(name)
         self.model_pull_cnt[name] += 1
 
         self.model_score[name].append(score)

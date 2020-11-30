@@ -57,6 +57,14 @@ def do_inference(context, bindings, inputs, outputs, stream):
     end = time.perf_counter_ns()
     return [output["host"] for output in outputs], (end - start) * 1e-6
 
+"""
+Using the groundtruth as the user/system feedback
+"""
+def reward_fn_feedback(predict, gt):
+    if predict == gt:
+        return 1.0
+    else:
+        return 0
 
 """
 Using the weighted accuracy of the expected accuracy as reward
@@ -66,25 +74,6 @@ def reward_fn_distri(predict, expected_accuracy):
     if predict >= n_label:
         return None
     return expected_accuracy[predict]
-
-"""
-Using the teacher model in server to cost. Using the statiscal closeness of the output as reward
-"""
-def reward_fn_teacher(predict, predict_softmax, expected_accuracy, image):
-    # TorchServe
-    return 0
-
-def regert_fn(predict):
-    return 0
-
-def reward_fn(predict):
-    return 0
-
-def reward_fn_regert((predict, predict_softmax, expected_accuracy, image):
-    return 1.0 / (regert_fn(predict) + 0.001)
-
-def reward_fn_reward((predict, predict_softmax, expected_accuracy, image):
-    return reward_fn(predict)
 
 def main():
     K = 3
@@ -122,7 +111,7 @@ def main():
     profiler = profiling.Profiler(WINDOW_SIZE, FPS, omsi.model_cluster())
     stream = pycuda.driver.Stream()
     # for img, label in data_itr:
-    for img, _ in data_itr:
+    for img, gt in data_itr:
         target_idx = agent.choose()
         target_model = k_models[target_idx]
         target_context = contexts[target_idx]
@@ -134,7 +123,9 @@ def main():
         trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
         label = trt_output.argmax(dim=0).numpy()
 
-        reward = reward_fn_distri(label, omsi.expected_accuracy(target_model))
+        reward = reward_fn_feedback(label, gt)
+        # reward = reward_fn_distri(label, omsi.expected_accuracy(target_model))
+
         # Unavailable to evaluate
         if reward is None:
             continue
