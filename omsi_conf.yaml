@@ -1,17 +1,25 @@
 models:
-    modela: ./onnx_dir/modela.onnx
-    modelb: ./onnx_dir/modelb.onnx
-    modelc: ./onnx_dir/modelc.onnx
-    modeld: ./onnx_dir/modeld.onnx
-models_class:
-    modela: 1
-    modelb: 1
-    modelc: 2
-    modeld: 3
+    mobilenet_34.67_66.84: /workplace/models/mobilenet_34.67_66.84.onnx
+    mobilenet_36.04_37.97: /workplace/models/mobilenet_36.04_37.97.onnx
+    mobilenet_41.75_33.35: /workplace/models/mobilenet_41.75_33.35.onnx
+    # resnet18_39.52_66.54: /workplace/models/resnet18_39.52_66.54.onnx
+    # resnet18_40.87_46.49: /workplace/models/resnet18_40.87_46.49.onnx
+    # resnet18_42.63_15.38: /workplace/models/resnet18_42.63_15.38.onnx
+    # resnet18_58.17_71.87: /workplace/models/resnet18_58.17_71.87.onnx
+    # resnet18_58.66_55.21: /workplace/models/resnet18_58.66_55.21.onnx
 cluster_center:
-    1: modela
-    2: modelc
-    3: modeld
+    # 0: resnet18_58.66_55.21
+    1: mobilenet_41.75_33.35
+    # 2: resnet18_42.63_15.38
+model_cluster:
+    mobilenet_34.67_66.84: 1
+    mobilenet_36.04_37.97: 1
+    mobilenet_41.75_33.35: 1
+    # resnet18_39.52_66.54: 0
+    # resnet18_40.87_46.49: 0
+    # resnet18_42.63_15.38: 2
+    # resnet18_58.17_71.87: 0
+    # resnet18_58.66_55.21: 0
 expected_accuracy:
     modela: # array of size 10
     - 0.89

@@ -19,13 +19,9 @@ class NonStationaryBanditAgent(object):
     def __init__(self, policy, n_option, option_names):
         self.policy = policy
         self.n = n_option
-        self.option_name_map = {}
         assert len(option_names) == n_option
-        i = 0
-        for name in option_names:
-            self.option_name_map[name] = i
-            i += 1
-        self.avail_idx = []
+        self.option_name_map = {name: i for i, name in enumerate(option_names)}
+        self.avail_idx = list(range(n_option))
 
         self.step = 0
         self.discount_factor = 0.8
@@ -40,6 +36,7 @@ class NonStationaryBanditAgent(object):
         if len(self.avail_idx) == 0:
             print("Cannot add option since no place leave")
             return False
+        print("Add option %s" % option_name)
         idx = self.avail_idx.pop()
         self.option_name_map[option_name] = idx
         return True
@@ -51,6 +48,7 @@ class NonStationaryBanditAgent(object):
         self.pull_cnt[target] = 0
         self.disc_cnt[target] = 0
         self.indices[target] = 0
+        print("Kick option %s" % option_name)
         del self.option_name_map[option_name]
         self.avail_idx.append(target)
 

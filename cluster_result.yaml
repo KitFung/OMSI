@@ -1,8 +1,13 @@
 cluster_center:
-  0: model_name_c
-  1: model_name_d
+  0: resnet18_58.66_55.21
+  1: mobilenet_41.75_33.35
+  2: resnet18_42.63_15.38
 models_class:
-  model_name_a: 0
-  model_name_b: 1
-  model_name_c: 0
-  model_name_d: 1
+  mobilenet_34.67_66.84: 1
+  mobilenet_36.04_37.97: 1
+  mobilenet_41.75_33.35: 1
+  resnet18_39.52_66.54: 0
+  resnet18_40.87_46.49: 0
+  resnet18_42.63_15.38: 2
+  resnet18_58.17_71.87: 0
+  resnet18_58.66_55.21: 0

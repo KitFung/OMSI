@@ -7,9 +7,9 @@ class Profiler(object):
         self.window_size = window_size
         self.model_pull_cnt = defaultdict(int)
         self.model_score = defaultdict(list)
-        self.model_ms = {}
-        self.total_score = {}
-        self.total_ms = {}
+        self.model_ms = defaultdict(list)
+        self.total_score = defaultdict(float)
+        self.total_ms = defaultdict(float)
         self.invalid = set()
         self.selected_record = []
 
@@ -45,7 +45,7 @@ class Profiler(object):
         self.invalid.add(name)
 
     def profile_once(self, name, score, ms):
-        self.selected_record.append(name)
+        self.selected_record.append((name, score, ms))
         self.model_pull_cnt[name] += 1
 
         self.model_score[name].append(score)

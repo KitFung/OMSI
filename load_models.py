@@ -61,6 +61,7 @@ class ModelStore(object):
                 parser = trt.OnnxParser(network, TRT_LOGGER)
                 builder.max_workspace_size = 1 << 28
                 builder.max_batch_size = 1
+                print(model_path)
                 with open(model_path, 'rb') as onnx_model:
                     parser.parse(onnx_model.read())
                 model_engine = builder.build_cuda_engine(network)
@@ -85,9 +86,9 @@ class ModelStore(object):
                 break
         if len(out) < k:
             all_avail_name = []
-            for k, v in self.model_status:
-                if k not in out and v == ModelStatus.SWAP_OFF:
-                    all_avail_name.append(k)
+            for name, v in self.model_status.items():
+                if name not in out and v == ModelStatus.SWAP_OFF:
+                    all_avail_name.append(name)
             random.shuffle(all_avail_name)
             out.extend(all_avail_name[:k - len(out)])
         return out

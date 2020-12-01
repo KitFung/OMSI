@@ -48,7 +48,7 @@ class OMSILoader(object):
 
         self.store = ModelStore(
             self.conf['models'],
-            self.conf['models_class'],
+            self.conf['model_cluster'],
             self.conf['cluster_center'])
 
         for k, v in self.conf['expected_accuracy'].items():

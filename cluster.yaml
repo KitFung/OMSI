@@ -1,16 +1,25 @@
 config:
-  model_name_a:
-    net: inception_v4
-    sparisity: 0
-  model_name_b:
+  mobilenet_34.67_66.84:
+    net: mobilenet_v2
+    sparisity: 66.84
+  mobilenet_36.04_37.97:
+    net: mobilenet_v2
+    sparisity: 37.97
+  mobilenet_41.75_33.35:
+    net: mobilenet_v2
+    sparisity: 33.35
+  resnet18_39.52_66.54:
     net: resnet18
-    sparisity: 0.1
-  model_name_c:
-    net: inception_v4
-    sparisity: 0.2
-  model_name_d:
+    sparisity: 66.54
+  resnet18_40.87_46.49:
     net: resnet18
-    sparisity: 0.9
-  # - model_name_b: ./path/to/model_b
-  # - model_name_c: ./path/to/model_c
-  # - model_name_d: ./path/to/model_d
+    sparisity: 46.49
+  resnet18_42.63_15.38:
+    net: resnet18
+    sparisity: 15.38
+  resnet18_58.17_71.87:
+    net: resnet18
+    sparisity: 71.87
+  resnet18_58.66_55.21:
+    net: resnet18
+    sparisity: 55.21

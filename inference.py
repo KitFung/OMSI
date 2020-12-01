@@ -42,7 +42,7 @@ def allocate_buffers(model_engine):
 
 
 def do_inference(context, bindings, inputs, outputs, stream):
-    start = time.perf_counter_ns()
+    start = time.perf_counter()
     # send inputs to device (GPU)
     for input in inputs:
         pycuda.driver.memcpy_htod_async(input["device"], input["host"], stream)
@@ -54,8 +54,8 @@ def do_inference(context, bindings, inputs, outputs, stream):
             output["host"], output["device"], stream)
     # waot for all activity on this stream to cease, then return.
     stream.synchronize()
-    end = time.perf_counter_ns()
-    return [output["host"] for output in outputs], (end - start) * 1e-6
+    end = time.perf_counter()
+    return [output["host"] for output in outputs], (end - start) * 1000.0
 
 """
 Using the groundtruth as the user/system feedback
@@ -76,7 +76,7 @@ def reward_fn_distri(predict, expected_accuracy):
     return expected_accuracy[predict]
 
 def main():
-    K = 3
+    K = 2
     WINDOW_SIZE = 1000
     FPS = 30.0
     OMSI_CONF = './omsi_conf.yaml'
@@ -89,15 +89,15 @@ def main():
     omsi.load(OMSI_CONF)
     store = omsi.model_store()
     k_models = store.select_top_k(K)
-
     agent = NonStationaryBanditAgent(Policy(), K, k_models)
 
     # Step 2: Create context for data pipeline
     data_itr = dataloader.load_with_probability_seq(
-        DATASET_DIR, PROBABILITY_SEQ)
+        PROBABILITY_SEQ, DATASET_DIR)
 
     # Step 3: Create engine and context for the K cand models
-    engines = store.load_models_blocking(k_models)
+    engines_map = store.load_models_blocking(k_models)
+    engines = [engines_map[m] for m in k_models]
 
     inputs, outputs, bindings = allocate_buffers(engines[0])
     contexts = [engine.create_execution_context() for engine in engines]
@@ -110,12 +110,11 @@ def main():
     #     Step 4.4: Update predict acc
     profiler = profiling.Profiler(WINDOW_SIZE, FPS, omsi.model_cluster())
     stream = pycuda.driver.Stream()
-    # for img, label in data_itr:
     for img, gt in data_itr:
         target_idx = agent.choose()
         target_model = k_models[target_idx]
         target_context = contexts[target_idx]
-        inputs[0]["host"] = img
+        inputs[0]["host"] = np.array(img, dtype=np.float32, order='C')
         out, ms = do_inference(target_context, bindings,
                                inputs, outputs, stream)
 
@@ -123,7 +122,7 @@ def main():
         trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
         label = trt_output.argmax(dim=0).numpy()
 
-        reward = reward_fn_feedback(label, gt)
+        reward = reward_fn_feedback(int(label), int(gt))
         # reward = reward_fn_distri(label, omsi.expected_accuracy(target_model))
 
         # Unavailable to evaluate
@@ -134,11 +133,15 @@ def main():
         profiler.profile_once(target_model, reward, ms)
 
         if not profiler.model_acceptable(target_model):
+            print("Unacceptable")
+            print(profiler.selected_record)
             agent.kick_option(target_model)
             new_target = store.kick_and_next(
                 target_model, profiler.cluster_rank())
             agent.add_option(new_target)
         elif agent.initialized() and profiler.explore_enough(target_model):
+            print("Explore Enough")
+            print(profiler.selected_record)
             agent.kick_option(target_model)
             new_target = store.swapoff_and_next(
                 target_model, profiler.cluster_rank())
