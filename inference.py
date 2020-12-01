@@ -139,6 +139,7 @@ def main():
             new_target = store.kick_and_next(
                 target_model, profiler.cluster_rank())
             agent.add_option(new_target)
+            k_models[target_idx] = new_target
         elif agent.initialized() and profiler.explore_enough(target_model):
             print("Explore Enough")
             print(profiler.selected_record)
@@ -146,6 +147,7 @@ def main():
             new_target = store.swapoff_and_next(
                 target_model, profiler.cluster_rank())
             agent.add_option(new_target)
+            k_models[target_idx] = new_target
 
     torch.cuda.empty_cache()
     # Step N: Plot the model selection flow, accuracy flow, fps flow

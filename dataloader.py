@@ -122,6 +122,8 @@ def get_indices(dataset, label):
             indices.append(i)
     return indices
 
+def worker_init_fn(worker_id):                         
+    np.random.seed(0)
 
 def raw_loaders(dataset_dir):
     preprocess = transforms.Compose([
@@ -134,7 +136,7 @@ def raw_loaders(dataset_dir):
     raw_dataset = datasets.ImageFolder(dataset_dir, transform=preprocess)
     data_loaders = [
         iter(data.DataLoader(data.Subset(raw_dataset, get_indices(raw_dataset, i)),
-                             batch_size=1, shuffle=True))
+                             batch_size=1, shuffle=True, worker_init_fn=worker_init_fn))
         for i in TargetLabels]
     return data_loaders
 
