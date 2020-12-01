@@ -1,0 +1,8 @@
+cluster_center:
+  0: model_name_c
+  1: model_name_d
+models_class:
+  model_name_a: 0
+  model_name_b: 1
+  model_name_c: 0
+  model_name_d: 1

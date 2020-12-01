@@ -1,5 +1,16 @@
 config:
-  - model_name_a: ./path/to/model_a
-  - model_name_b: ./path/to/model_b
-  - model_name_c: ./path/to/model_c
-  - model_name_d: ./path/to/model_d
+  model_name_a:
+    net: inception_v4
+    sparisity: 0
+  model_name_b:
+    net: resnet18
+    sparisity: 0.1
+  model_name_c:
+    net: inception_v4
+    sparisity: 0.2
+  model_name_d:
+    net: resnet18
+    sparisity: 0.9
+  # - model_name_b: ./path/to/model_b
+  # - model_name_c: ./path/to/model_c
+  # - model_name_d: ./path/to/model_d
