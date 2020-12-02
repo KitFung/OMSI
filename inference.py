@@ -154,7 +154,8 @@ def main():
                 # print(profiler.selected_record)
                 agent.kick_option(target_model)
                 new_target = store.kick_and_next(
-                    target_model, profiler.cluster_rank())
+                    target_model, profiler.cluster_rank(),
+                    profiler.model_pull_cnt)
                 if new_target is not None:
                     agent.add_option(new_target)
                     k_models[target_idx] = new_target
@@ -167,7 +168,8 @@ def main():
             # print(profiler.selected_record)
             agent.kick_option(w_model)
             new_target = store.swapoff_and_next(
-                w_model, profiler.cluster_rank())
+                w_model, profiler.cluster_rank(),
+                profiler.model_pull_cnt)
             if new_target is not None:
                 agent.add_option(new_target)
                 k_models[worst_cand] = new_target

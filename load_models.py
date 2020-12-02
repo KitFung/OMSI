@@ -7,10 +7,12 @@ import tensorrt as trt
 
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
+
 class ModelStatus(Enum):
     SWAP_OFF = 1
     SWAP_ON = 2
     KICKED = 3
+
 
 class ModelStore(object):
     # models: {
@@ -57,7 +59,8 @@ class ModelStore(object):
                 model_engine = runtime.deserialize_cuda_engine(model.read())
         else:
             with trt.Builder(TRT_LOGGER) as builder:
-                EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+                EXPLICIT_BATCH = 1 << (int)(
+                    trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
                 network = builder.create_network(EXPLICIT_BATCH)
                 parser = trt.OnnxParser(network, TRT_LOGGER)
                 builder.max_workspace_size = 1 << 28
@@ -96,29 +99,41 @@ class ModelStore(object):
 
     # Selecting method:
     # Selecting model from the best cluster + probability random select
-    def _selected_next(self, cluster_rank):
-        for c in cluster_rank:
-            for name in self.model_arr[self.model_class == c]:
-                if self.model_status[name] == ModelStatus.SWAP_OFF:
-                    return name
-        import pdb; pdb.set_trace()
+    def _selected_next(self, cluster_rank, pull_cnt):
+        p = random.uniform(0, 1)
+        if p < 0.2:
+            all_cand = [
+                name for name in self.model_arr if self.model_status[name] == ModelStatus.SWAP_OFF]
+            if len(all_cand) > 0:
+                random.shuffle(all_cand)
+                return all_cand[0]
+        else:
+            for c in cluster_rank:
+                cand = []
+                for name in self.model_arr[self.model_class == c]:
+                    if self.model_status[name] == ModelStatus.SWAP_OFF:
+                        cand.append(name)
+                if len(cand) > 0:
+                    pcnt = np.array([pull_cnt[c] for c in cand])
+                    return cand[pcnt.argsort()[0]]
         return None
 
-    def swapoff_and_next(self, removed_one, cluster_rank):
-        nxt = self._selected_next(cluster_rank)
+    def swapoff_and_next(self, removed_one, cluster_rank, pull_cnt):
+        nxt = self._selected_next(cluster_rank, pull_cnt)
 
         self.model_status[removed_one] = ModelStatus.SWAP_OFF
         del self.model_engine[removed_one]
         if nxt is not None:
+            # This should change to be async if use in real world
             self.load_model(nxt)
         return nxt
 
-    def kick_and_next(self, removed_one, cluster_rank):
-        nxt = self._selected_next(cluster_rank)
+    def kick_and_next(self, removed_one, cluster_rank, pull_cnt):
+        nxt = self._selected_next(cluster_rank, pull_cnt)
 
         self.model_status[removed_one] = ModelStatus.KICKED
         del self.model_engine[removed_one]
         if nxt is not None:
+            # This should change to be async if use in real world
             self.load_model(nxt)
-
         return nxt
