@@ -40,6 +40,7 @@ class ModelStore(object):
         for i, (name, cluster) in enumerate(models_class.items()):
             self.model_arr.append(name)
             self.model_class[i] = cluster
+        self.model_arr = np.array(self.model_arr)
         self.cluster_center = cluster_center
 
     def load_model(self, target):
@@ -97,11 +98,10 @@ class ModelStore(object):
     # Selecting model from the best cluster + probability random select
     def _selected_next(self, cluster_rank):
         for c in cluster_rank:
-            cands = self.model_class == c
-            for cand in cands:
-                name = self.model_arr[cand]
+            for name in self.model_arr[self.model_class == c]:
                 if self.model_status[name] == ModelStatus.SWAP_OFF:
                     return name
+        import pdb; pdb.set_trace()
         return None
 
     def swapoff_and_next(self, removed_one, cluster_rank):
@@ -109,7 +109,8 @@ class ModelStore(object):
 
         self.model_status[removed_one] = ModelStatus.SWAP_OFF
         del self.model_engine[removed_one]
-
+        if nxt is not None:
+            self.load_model(nxt)
         return nxt
 
     def kick_and_next(self, removed_one, cluster_rank):
@@ -117,5 +118,7 @@ class ModelStore(object):
 
         self.model_status[removed_one] = ModelStatus.KICKED
         del self.model_engine[removed_one]
+        if nxt is not None:
+            self.load_model(nxt)
 
         return nxt

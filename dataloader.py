@@ -1,15 +1,15 @@
+import torch
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 import torch.utils.data as data
 
 import os
 import random
-
-datas = []
+import numpy as np
 
 TargetLabels = range(10)
 PSeq1 = [{
-    "breakpt": 400,
+    "breakpt": 1000,
     "distribution": {
         0: 0.1,
         1: 0.1,
@@ -23,7 +23,7 @@ PSeq1 = [{
         9: 0.1,
     },
 }, {
-    "breakpt": 800,
+    "breakpt": 2000,
     "distribution": {
         0: 0.1,
         2: 0.4,
@@ -32,13 +32,27 @@ PSeq1 = [{
         9: 0.2,
     },
 }, {
-    "breakpt": 1200,
+    "breakpt": 3000,
     "distribution": {
         5: 0.2,
         6: 0.2,
         7: 0.2,
         8: 0.2,
         9: 0.2,
+    },
+}, {
+    "breakpt": 4000,
+    "distribution": {
+        0: 0.1,
+        1: 0.1,
+        2: 0.1,
+        3: 0.1,
+        4: 0.1,
+        5: 0.1,
+        6: 0.1,
+        7: 0.1,
+        8: 0.1,
+        9: 0.1,
     },
 }]
 PSeq2 = [{
@@ -109,9 +123,18 @@ PSeq3 = [{
 }]
 
 PSeq = {
-    'PSeq1': PSeq1,
-    'PSeq2': PSeq2,
-    'PSeq3': PSeq3
+    'PSeq1': {
+        'len': 5000,
+        'seq': PSeq1,
+    },
+    'PSeq2': {
+        'len': 1500,
+        'seq': PSeq2,
+    },
+    'PSeq3': {
+        'len': 1500,
+        'seq': PSeq3,
+    },
 }
 
 
@@ -122,8 +145,17 @@ def get_indices(dataset, label):
             indices.append(i)
     return indices
 
-def worker_init_fn(worker_id):                         
+
+random.seed(0)
+torch.manual_seed(0)
+np.random.seed(0)
+
+
+def worker_init_fn(worker_id):
+    random.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
+
 
 def raw_loaders(dataset_dir):
     preprocess = transforms.Compose([
@@ -142,8 +174,8 @@ def raw_loaders(dataset_dir):
 
 
 def load_with_probability_seq(seq_name, dataset_dir):
-    seq = PSeq[seq_name]
-    cnt = 0
+    seq_len = PSeq[seq_name]['len']
+    seq = PSeq[seq_name]['seq']
     data_loaders = raw_loaders(dataset_dir)
 
     len_seq = len(seq)
@@ -158,9 +190,8 @@ def load_with_probability_seq(seq_name, dataset_dir):
             dis[i][j] = (k, cum + v)
             cum += t
 
-    probability_seq = [random.uniform(0, 1) for i in range(2000)]
-    for p in probability_seq:
-        cnt += 1
+    for cnt in range(1, seq_len + 1):
+        p = random.uniform(0, 1)
         if pi + 1 < len_seq and cnt >= breakpt[pi]:
             pi += 1
 
@@ -172,7 +203,8 @@ def load_with_probability_seq(seq_name, dataset_dir):
 
         out = next(data_loaders[target], None)
         if out is None:
-            raise "Not enough data"
+            data_loaders = raw_loaders(dataset_dir)
+            out = next(data_loaders[target], None)
         yield out
 
 

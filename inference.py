@@ -17,6 +17,12 @@ import load_models
 import dataloader
 import profiling
 
+import sys
+import warnings
+
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+
 # class_idx = json.load(open("labels.json"))
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
@@ -57,27 +63,35 @@ def do_inference(context, bindings, inputs, outputs, stream):
     end = time.perf_counter()
     return [output["host"] for output in outputs], (end - start) * 1000.0
 
+
 """
 Using the groundtruth as the user/system feedback
 """
+
+
 def reward_fn_feedback(predict, gt):
     if predict == gt:
         return 1.0
     else:
         return 0
 
+
 """
 Using the weighted accuracy of the expected accuracy as reward
 """
+
+
 def reward_fn_distri(predict, expected_accuracy):
     n_label = len(expected_accuracy)
     if predict >= n_label:
         return None
     return expected_accuracy[predict]
 
+
 def main():
     K = 2
     WINDOW_SIZE = 1000
+    EXPLORE_THRESHOLD = 1000
     FPS = 30.0
     OMSI_CONF = './omsi_conf.yaml'
     DATASET_DIR = './tiny-imagenet-200/train'
@@ -130,6 +144,7 @@ def main():
             continue
 
         agent.observe(target_model, reward)
+        agent.set_explore_threshold(EXPLORE_THRESHOLD)
         profiler.profile_once(target_model, reward, ms)
 
         # Replace model in K cand set
@@ -140,28 +155,22 @@ def main():
                 agent.kick_option(target_model)
                 new_target = store.kick_and_next(
                     target_model, profiler.cluster_rank())
-                agent.add_option(new_target)
-                k_models[target_idx] = new_target
+                if new_target is not None:
+                    agent.add_option(new_target)
+                    k_models[target_idx] = new_target
 
         worst_cand = agent.vote_the_worst()
         if worst_cand is not None:
             print("Swap off the not potential")
+            # profiler.show_mean_score()
             w_model = k_models[worst_cand]
             # print(profiler.selected_record)
             agent.kick_option(w_model)
             new_target = store.swapoff_and_next(
                 w_model, profiler.cluster_rank())
-            agent.add_option(new_target)
-            k_models[worst_cand] = new_target
-
-            # elif profiler.explore_enough(target_model):
-            #     print("Explore Enough")
-            #     # print(profiler.selected_record)
-            #     agent.kick_option(target_model)
-            #     new_target = store.swapoff_and_next(
-            #         target_model, profiler.cluster_rank())
-            #     agent.add_option(new_target)
-            #     k_models[target_idx] = new_target
+            if new_target is not None:
+                agent.add_option(new_target)
+                k_models[worst_cand] = new_target
 
     torch.cuda.empty_cache()
     # Step N: Plot the model selection flow, accuracy flow, fps flow

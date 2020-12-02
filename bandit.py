@@ -1,6 +1,7 @@
 import numpy as np
 from collections import defaultdict
 
+MIN_PULL_FOR_ACC = 200
 
 class Policy(object):
     # Select Max
@@ -33,14 +34,28 @@ class NonStationaryBanditAgent(object):
         self.disc_cnt = np.zeros(n_option)
         self.indices = np.zeros(n_option)
 
-        self.cache_cum_reward = defaultdict(float)
         self.cache_disc_cum_reward = defaultdict(float)
         self.cache_disc_cnt = defaultdict(float)
         self.cache_indices = defaultdict(float)
 
         self.join_step = defaultdict(int)
+        self.explore_threshold = 1000
+
+    def set_explore_threshold(self, explore_threshold):
+        self.explore_threshold = explore_threshold
+
+    def print_status(self):
+        print("indices:")
+        print(self.indices)
+        rewards = self.cum_reward / self.pull_cnt
+        print("rewards:")
+        print(rewards)
+        print(self.option_name_map)
+        print('-------')
 
     def add_option(self, option_name):
+        self.print_status()
+
         if len(self.avail_idx) == 0:
             print("Cannot add option since no place leave")
             return False
@@ -49,7 +64,7 @@ class NonStationaryBanditAgent(object):
         idx = self.avail_idx.pop()
 
         self.option_name_map[option_name] = idx
-        self.cum_reward[idx] = self.cache_cum_reward[option_name]
+        self.cum_reward[idx] = 0
         self.disc_cum_reward[idx] = self.cache_disc_cum_reward[option_name]
         self.pull_cnt[idx] = 0
         self.disc_cnt[idx] = self.cache_disc_cnt[option_name]
@@ -57,8 +72,9 @@ class NonStationaryBanditAgent(object):
         return True
 
     def kick_option(self, option_name):
+        self.print_status()
+
         target = self.option_name_map[option_name]
-        self.cache_cum_reward[option_name] = self.cum_reward[target]
         self.cache_disc_cum_reward[option_name] = self.disc_cum_reward[target]
         self.cache_disc_cnt[option_name] = self.disc_cnt[target]
         self.cache_indices[option_name] = self.indices[target]
@@ -68,7 +84,7 @@ class NonStationaryBanditAgent(object):
         self.pull_cnt[target] = 0
         self.disc_cnt[target] = 0
         self.indices[target] = 0
-        print("Kick option %s" % option_name)
+        print("Remove option %s" % option_name)
         del self.option_name_map[option_name]
         self.avail_idx.append(target)
 
@@ -91,5 +107,10 @@ class NonStationaryBanditAgent(object):
         return len(self.pull_cnt[self.pull_cnt == 0]) == 0
 
     def vote_the_worst(self):
-        # condition 1, explore enough
-        return 0
+        rewards = self.cum_reward / self.pull_cnt
+        mean_reward = np.mean(rewards[self.pull_cnt > MIN_PULL_FOR_ACC])
+        bad_ind = (self.pull_cnt > MIN_PULL_FOR_ACC) & (rewards < mean_reward)
+        for name, idx in self.option_name_map.items():
+            if bad_ind[idx] and self.step - self.join_step[name] > self.explore_threshold:
+                return idx
+        return None
