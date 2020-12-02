@@ -1,4 +1,5 @@
 import numpy as np
+from collections import defaultdict
 
 
 class Policy(object):
@@ -32,17 +33,36 @@ class NonStationaryBanditAgent(object):
         self.disc_cnt = np.zeros(n_option)
         self.indices = np.zeros(n_option)
 
+        self.cache_cum_reward = defaultdict(float)
+        self.cache_disc_cum_reward = defaultdict(float)
+        self.cache_disc_cnt = defaultdict(float)
+        self.cache_indices = defaultdict(float)
+
+        self.join_step = defaultdict(int)
+
     def add_option(self, option_name):
         if len(self.avail_idx) == 0:
             print("Cannot add option since no place leave")
             return False
         print("Add option %s" % option_name)
+        self.join_step[option_name] = self.step
         idx = self.avail_idx.pop()
+
         self.option_name_map[option_name] = idx
+        self.cum_reward[idx] = self.cache_cum_reward[option_name]
+        self.disc_cum_reward[idx] = self.cache_disc_cum_reward[option_name]
+        self.pull_cnt[idx] = 0
+        self.disc_cnt[idx] = self.cache_disc_cnt[option_name]
+        self.indices[idx] = self.cache_indices[option_name]
         return True
 
     def kick_option(self, option_name):
         target = self.option_name_map[option_name]
+        self.cache_cum_reward[option_name] = self.cum_reward[target]
+        self.cache_disc_cum_reward[option_name] = self.disc_cum_reward[target]
+        self.cache_disc_cnt[option_name] = self.disc_cnt[target]
+        self.cache_indices[option_name] = self.indices[target]
+
         self.cum_reward[target] = 0
         self.disc_cum_reward[target] = 0
         self.pull_cnt[target] = 0
@@ -69,3 +89,7 @@ class NonStationaryBanditAgent(object):
 
     def initialized(self):
         return len(self.pull_cnt[self.pull_cnt == 0]) == 0
+
+    def vote_the_worst(self):
+        # condition 1, explore enough
+        return 0

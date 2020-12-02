@@ -118,7 +118,7 @@ def main():
         out, ms = do_inference(target_context, bindings,
                                inputs, outputs, stream)
 
-        # Convert the 1000 dimension output to
+        # Convert the 1000 dimension output to label
         trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
         label = trt_output.argmax(dim=0).numpy()
 
@@ -132,22 +132,36 @@ def main():
         agent.observe(target_model, reward)
         profiler.profile_once(target_model, reward, ms)
 
-        if not profiler.model_acceptable(target_model):
-            print("Unacceptable")
-            print(profiler.selected_record)
-            agent.kick_option(target_model)
-            new_target = store.kick_and_next(
-                target_model, profiler.cluster_rank())
-            agent.add_option(new_target)
-            k_models[target_idx] = new_target
-        elif agent.initialized() and profiler.explore_enough(target_model):
-            print("Explore Enough")
-            print(profiler.selected_record)
-            agent.kick_option(target_model)
+        # Replace model in K cand set
+        if agent.initialized():
+            if not profiler.model_acceptable(target_model):
+                print("Unacceptable %s" % target_model)
+                # print(profiler.selected_record)
+                agent.kick_option(target_model)
+                new_target = store.kick_and_next(
+                    target_model, profiler.cluster_rank())
+                agent.add_option(new_target)
+                k_models[target_idx] = new_target
+
+        worst_cand = agent.vote_the_worst()
+        if worst_cand is not None:
+            print("Swap off the not potential")
+            w_model = k_models[worst_cand]
+            # print(profiler.selected_record)
+            agent.kick_option(w_model)
             new_target = store.swapoff_and_next(
-                target_model, profiler.cluster_rank())
+                w_model, profiler.cluster_rank())
             agent.add_option(new_target)
-            k_models[target_idx] = new_target
+            k_models[worst_cand] = new_target
+
+            # elif profiler.explore_enough(target_model):
+            #     print("Explore Enough")
+            #     # print(profiler.selected_record)
+            #     agent.kick_option(target_model)
+            #     new_target = store.swapoff_and_next(
+            #         target_model, profiler.cluster_rank())
+            #     agent.add_option(new_target)
+            #     k_models[target_idx] = new_target
 
     torch.cuda.empty_cache()
     # Step N: Plot the model selection flow, accuracy flow, fps flow
