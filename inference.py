@@ -152,6 +152,7 @@ def main():
             if not profiler.model_acceptable(target_model):
                 print("Unacceptable %s" % target_model)
                 # print(profiler.selected_record)
+                profiler.invalid_model(target_model)
                 agent.kick_option(target_model)
                 new_target = store.kick_and_next(
                     target_model, profiler.cluster_rank(),
