@@ -1,6 +1,5 @@
 import time
 import os
-
 import torchvision
 import torchvision.transforms as transforms
 import tensorrt as trt
@@ -89,12 +88,20 @@ def reward_fn_distri(predict, expected_accuracy):
 
 
 def main():
-    K = 2
+    K = 3
     WINDOW_SIZE = 1000
     EXPLORE_THRESHOLD = 1000
     FPS = 30.0
     OMSI_CONF = './omsi_conf.yaml'
     DATASET_DIR = './tiny-imagenet-200/train'
+
+    if len(sys.argv) > 1:
+        OMSI_CONF = sys.argv[1]
+    if len(sys.argv) > 2:
+        K = int(sys.argv[2])
+    if len(sys.argv) > 3:
+        DATASET_DIR = sys.argv[3]
+
     PROBABILITY_SEQ = 'PSeq1'
 
     # Step 1: Load the config: List of models, expected accuracy on each class, model distance
@@ -124,7 +131,11 @@ def main():
     #     Step 4.4: Update predict acc
     profiler = profiling.Profiler(WINDOW_SIZE, FPS, omsi.model_cluster())
     stream = pycuda.driver.Stream()
+    count_itr = 0
+    start_t = time.perf_counter()
     for img, gt in data_itr:
+        start_iter_t = time.perf_counter()
+        count_itr += 1
         target_idx = agent.choose()
         target_model = k_models[target_idx]
         target_context = contexts[target_idx]
@@ -135,7 +146,6 @@ def main():
         # Convert the 1000 dimension output to label
         trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
         label = trt_output.argmax(dim=0).numpy()
-
         reward = reward_fn_feedback(int(label), int(gt))
         # reward = reward_fn_distri(label, omsi.expected_accuracy(target_model))
 
@@ -146,7 +156,7 @@ def main():
         agent.observe(target_model, reward)
         agent.set_explore_threshold(EXPLORE_THRESHOLD)
         profiler.profile_once(target_model, reward, ms)
-
+        ms = 0.0 #for time load_model
         # Replace model in K cand set
         if agent.initialized():
             if not profiler.model_acceptable(target_model):
@@ -154,7 +164,7 @@ def main():
                 # print(profiler.selected_record)
                 profiler.invalid_model(target_model)
                 agent.kick_option(target_model)
-                new_target = store.kick_and_next(
+                new_target, ms = store.kick_and_next(
                     target_model, profiler.cluster_rank(),
                     profiler.model_pull_cnt)
                 if new_target is not None:
@@ -168,17 +178,31 @@ def main():
             w_model = k_models[worst_cand]
             # print(profiler.selected_record)
             agent.kick_option(w_model)
-            new_target = store.swapoff_and_next(
+            new_target, ms = store.swapoff_and_next(
                 w_model, profiler.cluster_rank(),
                 profiler.model_pull_cnt)
             if new_target is not None:
                 agent.add_option(new_target)
                 k_models[worst_cand] = new_target
 
+        end_iter_t = time.perf_counter()
+        profiler.log_load_model(ms)
+        profiler.log_single_iter((end_iter_t - start_iter_t)*1000.0 )
+    end_t = time.perf_counter()
+    
+    print('-------')
+    print('inference image count', count_itr)
+    print('[inference_all], elapsed time (s): ',round(end_t - start_t, 4))
+
     torch.cuda.empty_cache()
     # Step N: Plot the model selection flow, accuracy flow, fps flow
-    profiler.draw_report()
-
+    profiler.export_json()
+    #print_summary
+    print('-------')
+    print('K:', K)
+    print('WINDOW_SIZE:', WINDOW_SIZE)
+    print('EXPLORE_THRESHOLD', EXPLORE_THRESHOLD)
+    print('FPS', FPS)
 
 if __name__ == '__main__':
     main()

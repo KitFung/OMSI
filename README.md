@@ -16,3 +16,8 @@ pip install -r requirements.txt
 
 python inference omsi_conf.yaml
 ```
+
+# Jetson Nano run
+```
+python3 inference.py ./configs/wingk/omsi_conf.yaml 2 ~/tiny-imagenet-200/train
+```

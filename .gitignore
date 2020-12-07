@@ -1,2 +1,9 @@
 tiny-imagenet-200/
 tiny-imagenet-200.zip
+
+.idea/
+
+#.trt is device sepecific format; need to be regenerated on target device
+models/*.trt
+playground/
+log/

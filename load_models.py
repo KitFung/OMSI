@@ -4,6 +4,7 @@ import random
 
 import numpy as np
 import tensorrt as trt
+import time
 
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
@@ -46,6 +47,7 @@ class ModelStore(object):
         self.cluster_center = cluster_center
 
     def load_model(self, target):
+        start_t = time.perf_counter()
         if self.model_engine.get(target, None) is not None:
             return self.model_engine[target]
 
@@ -73,12 +75,13 @@ class ModelStore(object):
                     f.write(model_engine.serialize())
         self.model_engine[target] = model_engine
         self.model_status[target] = ModelStatus.SWAP_ON
-        return self.model_engine[target]
+        end_t = time.perf_counter()
+        return self.model_engine[target], (end_t - start_t)*1000.0
 
     def load_models_blocking(self, targets):
         engines = {}
         for target in targets:
-            engines[target] = self.load_model(target)
+            engines[target], _ = self.load_model(target)
         return engines
 
     def select_top_k(self, k):
@@ -123,17 +126,19 @@ class ModelStore(object):
 
         self.model_status[removed_one] = ModelStatus.SWAP_OFF
         del self.model_engine[removed_one]
+        ms = 0
         if nxt is not None:
             # This should change to be async if use in real world
-            self.load_model(nxt)
-        return nxt
+            _, ms = self.load_model(nxt)
+        return nxt, ms
 
     def kick_and_next(self, removed_one, cluster_rank, pull_cnt):
         nxt = self._selected_next(cluster_rank, pull_cnt)
 
         self.model_status[removed_one] = ModelStatus.KICKED
         del self.model_engine[removed_one]
+        ms = 0
         if nxt is not None:
             # This should change to be async if use in real world
-            self.load_model(nxt)
-        return nxt
+            _, ms = self.load_model(nxt)
+        return nxt, ms
