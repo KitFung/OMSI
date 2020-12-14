@@ -8,6 +8,7 @@ import json
 class Profiler(object):
     def __init__(self, window_size, required_fps, model_cluster):
         self.window_size = window_size
+        self.overall_score = 0.0
         self.model_pull_cnt = defaultdict(int)
         self.model_score = defaultdict(list)
         self.model_ms = defaultdict(list)
@@ -39,9 +40,10 @@ class Profiler(object):
         self.invalid.add(name)
 
     def profile_once(self, names, weights, score, ms):
-        self.selected_record.append((names, weights, score, ms))
+        self.selected_record.append((list(names), list(weights), score, ms))
         name = ','.join(sorted(names))
         self.model_pull_cnt[name] += 1
+        self.overall_score += score
 
         self.model_score[name].append(score)
         self.model_ms[name].append(ms)

@@ -14,7 +14,7 @@ docker run --gpus=all --rm -it -v $(pwd):/workplace nvcr.io/nvidia/tensorrt:20.1
 cd /workplace
 pip install -r requirements.txt
 
-python inference omsi_conf.yaml
+python inference.py omsi_conf.yaml
 ```
 
 # Jetson Nano run

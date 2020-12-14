@@ -90,7 +90,7 @@ class NonStationaryBanditAgent(object):
         self.avail_idx.append(target)
 
     def choose(self):
-        return self.policy.choose(self)
+        return self.option_names[self.policy.choose(self)]
 
     def observe(self, name, reward):
         target = self.option_name_map[name]
@@ -105,6 +105,6 @@ class NonStationaryBanditAgent(object):
             self.confidence_scale * np.log(self.disc_cnt.sum()) / self.disc_cnt)
 
     def explore_enough(self, k_models):
-        ind = [self.option_names.index(m) for m in k_models]
-        return self.pull_cnt[ind].min() > self.explore_threshold
+        pull_cnt = [self.pull_cnt[self.option_names == m] for m in k_models]
+        return min(pull_cnt) > self.explore_threshold
 
