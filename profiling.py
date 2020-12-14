@@ -19,16 +19,6 @@ class Profiler(object):
         self.load_model_ms = []
         self.model_cluster = model_cluster
         self.threshold_ms = 1000.0 / required_fps
-        self.explore_threshold = 1000
-
-    # Maybe consider both variance and mean
-    def model_acceptable(self, name):
-        if not self.explore_enough(name):
-            return True
-        return np.mean(self.model_ms[name][1:])
-
-    def explore_enough(self, name):
-        return self.model_pull_cnt[name] >= self.explore_threshold
 
     def cluster_rank(self):
         cluster_best_score = {}
@@ -48,8 +38,9 @@ class Profiler(object):
     def invalid_model(self, name):
         self.invalid.add(name)
 
-    def profile_once(self, name, score, ms):
-        self.selected_record.append((name, score, ms))
+    def profile_once(self, names, weights, score, ms):
+        self.selected_record.append((names, weights, score, ms))
+        name = ','.join(sorted(names))
         self.model_pull_cnt[name] += 1
 
         self.model_score[name].append(score)

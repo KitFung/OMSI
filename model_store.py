@@ -78,6 +78,9 @@ class ModelStore(object):
         end_t = time.perf_counter()
         return self.model_engine[target], (end_t - start_t)*1000.0
 
+    def removed_model(self, target):
+        del self.model_engine[target]
+
     def load_models_blocking(self, targets):
         engines = {}
         for target in targets:
@@ -125,20 +128,15 @@ class ModelStore(object):
         nxt = self._selected_next(cluster_rank, pull_cnt)
 
         self.model_status[removed_one] = ModelStatus.SWAP_OFF
-        del self.model_engine[removed_one]
+        self.removed_model(removed_one)
         ms = 0
         if nxt is not None:
             # This should change to be async if use in real world
             _, ms = self.load_model(nxt)
         return nxt, ms
 
-    def kick_and_next(self, removed_one, cluster_rank, pull_cnt):
-        nxt = self._selected_next(cluster_rank, pull_cnt)
-
-        self.model_status[removed_one] = ModelStatus.KICKED
-        del self.model_engine[removed_one]
-        ms = 0
-        if nxt is not None:
-            # This should change to be async if use in real world
-            _, ms = self.load_model(nxt)
+    def swapoff_and_custom_next(self, removed_one, nxt):
+        self.model_status[removed_one] = ModelStatus.SWAP_OFF
+        self.removed_model(removed_one)
+        _, ms = self.load_model(nxt)
         return nxt, ms

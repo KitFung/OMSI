@@ -1,7 +1,7 @@
 import yaml
 import numpy as np
 
-from load_models import ModelStore
+from model_store import ModelStore
 
 """
 Expected conf format:
@@ -19,16 +19,6 @@ cluster_center:
     1: modela
     2: modelc
     3: modeld
-expected_accuracy:
-    modela: # array of size 10
-    - 0.89
-    - 0.99
-    - 0.78
-    ...
-    - 0.39
-    modelb: # array of size 10
-    - 0.78
-    ...
 """
 
 

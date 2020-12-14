@@ -21,6 +21,7 @@ class NonStationaryBanditAgent(object):
     def __init__(self, policy, n_option, option_names):
         self.policy = policy
         self.n = n_option
+        self.option_names = option_names
         assert len(option_names) == n_option
         self.option_name_map = {name: i for i, name in enumerate(option_names)}
         self.avail_idx = list(range(n_option))
@@ -103,26 +104,7 @@ class NonStationaryBanditAgent(object):
         self.indices = self.disc_cum_reward / self.disc_cnt + 2 * np.sqrt(
             self.confidence_scale * np.log(self.disc_cnt.sum()) / self.disc_cnt)
 
-    def initialized(self):
-        return len(self.pull_cnt[self.pull_cnt == 0]) == 0
+    def explore_enough(self, k_models):
+        ind = [self.option_names.index(m) for m in k_models]
+        return self.pull_cnt[ind].min() > self.explore_threshold
 
-    def vote_the_worst(self):
-        rewards = self.cum_reward / self.pull_cnt
-        mean_reward = np.mean(rewards[self.pull_cnt > MIN_PULL_FOR_ACC])
-        bad_ind = (self.pull_cnt > MIN_PULL_FOR_ACC) & (rewards < mean_reward)
-        for name, idx in self.option_name_map.items():
-            if bad_ind[idx] and self.step - self.join_step[name] > self.explore_threshold:
-                return idx
-        return None
-
-    def vote_the_worst_half(self):
-        rewards = self.cum_reward / self.pull_cnt
-        mean_reward = np.median(rewards)
-        bad_ind = rewards <= mean_reward
-        cands = []
-        for name, idx in self.option_name_map.items():
-            if bad_ind[idx]:
-                cands.append(idx)
-                if len(cands) >= self.n // 2:
-                    return cands
-        return cands
