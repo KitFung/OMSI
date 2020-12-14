@@ -114,3 +114,15 @@ class NonStationaryBanditAgent(object):
             if bad_ind[idx] and self.step - self.join_step[name] > self.explore_threshold:
                 return idx
         return None
+
+    def vote_the_worst_half(self):
+        rewards = self.cum_reward / self.pull_cnt
+        mean_reward = np.median(rewards)
+        bad_ind = rewards <= mean_reward
+        cands = []
+        for name, idx in self.option_name_map.items():
+            if bad_ind[idx]:
+                cands.append(idx)
+                if len(cands) >= self.n // 2:
+                    return cands
+        return cands

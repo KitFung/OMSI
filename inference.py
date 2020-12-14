@@ -1,5 +1,7 @@
 import time
 import os
+import sys
+import warnings
 import torchvision
 import torchvision.transforms as transforms
 import tensorrt as trt
@@ -15,9 +17,8 @@ import omsi_loader
 import load_models
 import dataloader
 import profiling
+import metric
 
-import sys
-import warnings
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -63,22 +64,6 @@ def do_inference(context, bindings, inputs, outputs, stream):
     return [output["host"] for output in outputs], (end - start) * 1000.0
 
 
-"""
-Using the groundtruth as the user/system feedback
-"""
-
-
-def reward_fn_feedback(predict, gt):
-    if predict == gt:
-        return 1.0
-    else:
-        return 0
-
-
-"""
-Using the weighted accuracy of the expected accuracy as reward
-"""
-
 
 def reward_fn_distri(predict, expected_accuracy):
     n_label = len(expected_accuracy)
@@ -123,19 +108,22 @@ def main():
     inputs, outputs, bindings = allocate_buffers(engines[0])
     contexts = [engine.create_execution_context() for engine in engines]
 
-    # Step 4: Start N round, inference and profile
-    #     Step 4.1: Inference
-    #     Step 4.2: Time as a hard constraint, replace the failed models (failed fps with n out of m time in window)
-    #               (First find best predict acc in group, Otherwise, use best predict acc in other group)
-    #     Step 4.3: Sliding window for class label
-    #     Step 4.4: Update predict acc
     profiler = profiling.Profiler(WINDOW_SIZE, FPS, omsi.model_cluster())
     stream = pycuda.driver.Stream()
     count_itr = 0
     start_t = time.perf_counter()
+
+    softmax_chunk = {}
+    gt_chunk = []
+
     for img, gt in data_itr:
         start_iter_t = time.perf_counter()
+
         count_itr += 1
+        # 
+        if count_itr % 500 == 0:
+            pass
+
         target_idx = agent.choose()
         target_model = k_models[target_idx]
         target_context = contexts[target_idx]
@@ -146,8 +134,7 @@ def main():
         # Convert the 1000 dimension output to label
         trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
         label = trt_output.argmax(dim=0).numpy()
-        reward = reward_fn_feedback(int(label), int(gt))
-        # reward = reward_fn_distri(label, omsi.expected_accuracy(target_model))
+        reward = metric.reward_fn_feedback(int(label), int(gt))
 
         # Unavailable to evaluate
         if reward is None:
