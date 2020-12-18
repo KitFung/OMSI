@@ -1,10 +1,9 @@
+import pathlib
 import time
 import collections
-import os
+import datetime
 import sys
 import warnings
-import torchvision
-import torchvision.transforms as transforms
 import tensorrt as trt
 import onnxruntime as ort
 
@@ -12,12 +11,9 @@ import pycuda
 import pycuda.autoinit
 import torch
 import numpy as np
-from PIL import Image
-import json
 
 from bandit import NonStationaryBanditAgent, Policy
 import omsi_loader
-import model_store
 import dataloader
 import profiling
 import metric
@@ -256,7 +252,21 @@ def main():
 
     torch.cuda.empty_cache()
     # Step N: Plot result
-    profiler.export_json()
+    current_time = datetime.datetime.today().strftime('%Y%m%d_%H%M%S')
+    log_path = (pathlib.Path.cwd() / 'log' / current_time)
+    log_path.mkdir(parents=True, exist_ok=True)
+    profiler.export_json(log_path)
+    profiler.save_png(log_path, omsi.conf['models'])
+    file1 = open( log_path / "summary.txt", "w")
+    file1.write('USE_ONNX: ' + str(USE_ONNX)+"\n")
+    file1.write('K: ' + str(K)+"\n")
+    file1.write('WINDOW_SIZE: ' + str(WINDOW_SIZE)+"\n")
+    file1.write('EXPLORE_THRESHOLD: ' + str(EXPLORE_THRESHOLD)+"\n")
+    file1.write('FPS: ' + str(FPS)+"\n")
+    file1.write("Overall Score: %f " % (profiler.overall_score / float(count_itr))+"\n")
+    file1.write("Wall time for all images: %f " % ( round(end_t - start_t, 4))+"\n")
+    file1.close()
+
     # print_summary
     print('-------')
     print('K:', K)
