@@ -6,6 +6,8 @@ import warnings
 import torchvision
 import torchvision.transforms as transforms
 import tensorrt as trt
+import onnxruntime as ort
+
 import pycuda
 import pycuda.autoinit
 import torch
@@ -48,6 +50,16 @@ def allocate_buffers(model_engine):
     return inputs, outputs, bindings
 
 
+def do_inference_onnx(sess, inp):
+    input_name = sess.get_inputs()[0].name
+    label_name = sess.get_outputs()[0].name
+    start = time.perf_counter()
+    pred = sess.run([label_name], {input_name: inp.astype(np.float32)})[0]
+    end = time.perf_counter()
+    return pred, (end - start)*1000.0
+    #return pred.argmax(), (end - start)*1000.0
+
+
 def do_inference(context, bindings, inputs, outputs, stream):
     start = time.perf_counter()
     # send inputs to device (GPU)
@@ -80,11 +92,34 @@ def pre_measure_inference_time(img, store, models):
     return times
 
 
+def pre_measure_inference_time_onnx(img, store, models):
+    times = {}
+    engines = {}
+
+    for model in models:
+        for __ in range(5):
+            if model not in engines:
+                eng = ort.InferenceSession(store.models[model])
+                engines[model] = eng
+            else:
+                eng = engines[model]
+            # for some reasons this cant be done in store.
+            #eng, ms = store.load_model(model)
+            ___, ms = do_inference_onnx(eng, np.array(img, dtype=np.float32, order='C'))
+            times[model] = ms
+        #store.removed_model(model)
+    return times
+
+
 def main():
-    K = 5
+    # ONNX or TRT
+    USE_ONNX = True
+    if USE_ONNX:
+        print('Onnxruntime Device:', ort.get_device())
+
     WINDOW_SIZE = 1000
     EXPLORE_THRESHOLD = 1000
-    FPS = 30.0
+    FPS = 60.0
     WEIGHT_UPDATE_WINDOW = 256
     OMSI_CONF = './omsi_conf.yaml'
     DATASET_DIR = './tiny-imagenet-200/train'
@@ -92,7 +127,7 @@ def main():
     if len(sys.argv) > 1:
         OMSI_CONF = sys.argv[1]
     if len(sys.argv) > 2:
-        K = int(sys.argv[2])
+        FPS = int(sys.argv[2])
     if len(sys.argv) > 3:
         DATASET_DIR = sys.argv[3]
 
@@ -107,12 +142,19 @@ def main():
     omsi = omsi_loader.OMSILoader()
     omsi.load(OMSI_CONF)
     store = omsi.model_store()
+    store.use_onnx = USE_ONNX
+    if USE_ONNX:
+        expected_inference_time = pre_measure_inference_time_onnx(next(data_itr)[0], store, store.model_arr)
+    else:
+        expected_inference_time = pre_measure_inference_time(next(data_itr)[0], store, store.model_arr)
 
-    expected_inference_time = pre_measure_inference_time(
-        next(data_itr)[0], store, store.model_arr)
     ave_inference_time = np.mean(list(expected_inference_time.values()))
-
+    print('ave_inference_time', ave_inference_time)
+    print('len(store.model_arr)', len(store.model_arr))
     K = min(len(store.model_arr), int((1000.0 / FPS) / ave_inference_time))
+    if K == 0: #
+        print('K can\'t be zero. setting K=1.\nFPS too high or ave_inference_time too large?')
+        K = 1
     print(">> K: %d" % K)
     k_models = store.select_top_k(K)
     agent = NonStationaryBanditAgent(
@@ -122,8 +164,9 @@ def main():
     # Step 3: Create engine and context for the K cand models
     engines_map = store.load_models_blocking(k_models)
     engines = [engines_map[m] for m in k_models]
-    inputs, outputs, bindings = allocate_buffers(engines[0])
-    contexts = [engine.create_execution_context() for engine in engines]
+    if not USE_ONNX:
+        inputs, outputs, bindings = allocate_buffers(engines[0])
+        contexts = [engine.create_execution_context() for engine in engines]
 
     profiler = profiling.Profiler(WINDOW_SIZE, FPS, omsi.model_cluster())
     stream = pycuda.driver.Stream()
@@ -140,7 +183,6 @@ def main():
         start_iter_t = time.perf_counter()
         count_itr += 1
         load_model_ms = 0.0  # for time load_model
-
         # Step 4: Update the weight
         if count_itr % WEIGHT_UPDATE_WINDOW == 0:
             mse_arr = np.array(
@@ -162,16 +204,19 @@ def main():
                     _, load_model_ms = store.swapoff_and_custom_next(
                         w_model, nxt_model)
                     k_models[worst_ind] = nxt_model
+                    print('nxt_model', nxt_model)
             weights = new_weights
 
         # Step 5: Inference with ensemble
         label_comb = None
-        inputs[0]["host"] = np.array(img, dtype=np.float32, order='C')
         inference_ms = 0
         for idx in range(K):
             target_model = k_models[idx]
-            out, ms = do_inference(contexts[idx], bindings,
-                                   inputs, outputs, stream)
+            if USE_ONNX:
+                out, ms = do_inference_onnx(store.model_engine[target_model], np.array(img, dtype=np.float32, order='C'))
+            else:
+                inputs[0]["host"] = np.array(img, dtype=np.float32, order='C')
+                out, ms = do_inference(contexts[idx], bindings, inputs, outputs, stream)
             inference_ms += ms
             # Convert the 1000 dimension output to label
             trt_output = torch.nn.functional.softmax(

@@ -1,9 +1,12 @@
 import os
 from enum import Enum
 import random
-
+import onnxruntime as ort
 import numpy as np
-import tensorrt as trt
+try:
+    import tensorrt as trt
+except ImportError:
+    trt = None
 import time
 
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
@@ -32,6 +35,7 @@ class ModelStore(object):
     #   3: name3,
     # }
     def __init__(self, models, models_class, cluster_center):
+        self.use_onnx = False
         self.models = models
         self.model_status = {}
         for name in models.keys():
@@ -53,26 +57,29 @@ class ModelStore(object):
 
         model_path = self.models[target]
         engine_file_path = model_path.replace('.onnx', '.trt')
-        model_engine = None
-        if os.path.exists(engine_file_path):
-            print("Reading engine from: ", engine_file_path)
-            # deserialize the engine file
-            with open(engine_file_path, "rb") as model, trt.Runtime(TRT_LOGGER) as runtime:
-                model_engine = runtime.deserialize_cuda_engine(model.read())
+        if self.use_onnx:
+            model_engine = ort.InferenceSession(model_path)
         else:
-            with trt.Builder(TRT_LOGGER) as builder:
-                EXPLICIT_BATCH = 1 << (int)(
-                    trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-                network = builder.create_network(EXPLICIT_BATCH)
-                parser = trt.OnnxParser(network, TRT_LOGGER)
-                builder.max_workspace_size = 1 << 28
-                builder.max_batch_size = 1
-                print(model_path)
-                with open(model_path, 'rb') as onnx_model:
-                    parser.parse(onnx_model.read())
-                model_engine = builder.build_cuda_engine(network)
-                with open(engine_file_path, "wb") as f:
-                    f.write(model_engine.serialize())
+            if os.path.exists(engine_file_path):
+                print("Reading engine from: ", engine_file_path)
+                # deserialize the engine file
+                with open(engine_file_path, "rb") as model, trt.Runtime(TRT_LOGGER) as runtime:
+                    model_engine = runtime.deserialize_cuda_engine(model.read())
+            else:
+                with trt.Builder(TRT_LOGGER) as builder:
+                    EXPLICIT_BATCH = 1 << (int)(
+                        trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+                    network = builder.create_network(EXPLICIT_BATCH)
+                    parser = trt.OnnxParser(network, TRT_LOGGER)
+                    builder.max_workspace_size = 1 << 28
+                    builder.max_batch_size = 1
+                    print(model_path)
+                    with open(model_path, 'rb') as onnx_model:
+                        parser.parse(onnx_model.read())
+                    model_engine = builder.build_cuda_engine(network)
+                    with open(engine_file_path, "wb") as f:
+                        f.write(model_engine.serialize())
+
         self.model_engine[target] = model_engine
         self.model_status[target] = ModelStatus.SWAP_ON
         end_t = time.perf_counter()

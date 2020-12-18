@@ -5,6 +5,20 @@
 
 # Setup:
 
+specify ONNX or TRT runtime in main().
+```
+USE_ONNX = True
+```
+if gpu avaiable:
+```
+pip install onnxruntime-gpu
+```
+cpu only:
+```
+pip install onnxruntime
+```
+
+
 ---
 
 ```
