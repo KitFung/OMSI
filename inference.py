@@ -9,6 +9,7 @@ import torch
 import numpy as np
 from PIL import Image
 import json
+import onnxruntime as ort
 
 from bandit import NonStationaryBanditAgent, Policy
 import omsi_loader
@@ -44,6 +45,16 @@ def allocate_buffers(model_engine):
         else:
             outputs.append({"host": host_memory, "device": device_memory})
     return inputs, outputs, bindings
+
+
+def do_inference_onnx(sess, inp):
+    input_name = sess.get_inputs()[0].name
+    label_name = sess.get_outputs()[0].name
+    start = time.time()
+    pred = sess.run([label_name], {input_name: inp.astype(np.float32)})[0]
+    end = time.time()
+
+    return pred, (end - start)*1000.0
 
 
 def do_inference(context, bindings, inputs, outputs, stream):
@@ -88,6 +99,9 @@ def reward_fn_distri(predict, expected_accuracy):
 
 
 def main():
+    USE_ONNX = True
+    if USE_ONNX:
+        print('Onnxruntime Device:', ort.get_device())
     K = 3
     WINDOW_SIZE = 1000
     EXPLORE_THRESHOLD = 1000
@@ -109,6 +123,8 @@ def main():
     omsi = omsi_loader.OMSILoader()
     omsi.load(OMSI_CONF)
     store = omsi.model_store()
+    store.use_onnx = USE_ONNX
+
     k_models = store.select_top_k(K)
     agent = NonStationaryBanditAgent(Policy(), K, k_models)
 
@@ -119,9 +135,9 @@ def main():
     # Step 3: Create engine and context for the K cand models
     engines_map = store.load_models_blocking(k_models)
     engines = [engines_map[m] for m in k_models]
-
-    inputs, outputs, bindings = allocate_buffers(engines[0])
-    contexts = [engine.create_execution_context() for engine in engines]
+    if not USE_ONNX:
+        inputs, outputs, bindings = allocate_buffers(engines[0])
+        contexts = [engine.create_execution_context() for engine in engines]
 
     # Step 4: Start N round, inference and profile
     #     Step 4.1: Inference
@@ -130,7 +146,9 @@ def main():
     #     Step 4.3: Sliding window for class label
     #     Step 4.4: Update predict acc
     profiler = profiling.Profiler(WINDOW_SIZE, FPS, omsi.model_cluster())
-    stream = pycuda.driver.Stream()
+
+    if not USE_ONNX:
+        stream = pycuda.driver.Stream()
     count_itr = 0
     start_t = time.perf_counter()
     for img, gt in data_itr:
@@ -138,9 +156,13 @@ def main():
         count_itr += 1
         target_idx = agent.choose()
         target_model = k_models[target_idx]
-        target_context = contexts[target_idx]
-        inputs[0]["host"] = np.array(img, dtype=np.float32, order='C')
-        out, ms = do_inference(target_context, bindings,
+        if USE_ONNX:
+            out, ms = do_inference_onnx(store.model_engine[target_model], np.array(img, dtype=np.float32, order='C'))
+        else:
+            target_context = contexts[target_idx]
+            inputs[0]["host"] = np.array(img, dtype=np.float32, order='C')
+            inputs[0]["host"] = np.array(img, dtype=np.float32, order='C')
+            out, ms = do_inference(target_context, bindings,
                                inputs, outputs, stream)
 
         # Convert the 1000 dimension output to label
