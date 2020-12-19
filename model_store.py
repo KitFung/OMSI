@@ -9,7 +9,8 @@ except ImportError:
     trt = None
 import time
 
-TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+if trt is not None:
+    TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 
 class ModelStatus(Enum):
