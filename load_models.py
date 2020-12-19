@@ -3,11 +3,15 @@ from enum import Enum
 import random
 
 import numpy as np
-import tensorrt as trt
+try:
+    import tensorrt as trt
+except ImportError:
+    trt = None
 import time
 import onnxruntime as ort
 
-TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+if trt is not None:
+    TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 
 class ModelStatus(Enum):

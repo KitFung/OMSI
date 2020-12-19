@@ -4,15 +4,16 @@ import time
 import os
 import torchvision
 import torchvision.transforms as transforms
-import tensorrt as trt
-import pycuda
-import pycuda.autoinit
+try:
+    import tensorrt as trt
+    import pycuda
+    import pycuda.autoinit
+except ImportError:
+    trt = None
 import torch
 import numpy as np
-from PIL import Image
-import json
 import onnxruntime as ort
-
+os.putenv('KMP_DUPLICATE_LIB_OK', 'TRUE')
 from bandit import NonStationaryBanditAgent, Policy
 import omsi_loader
 import load_models
@@ -26,7 +27,8 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 # class_idx = json.load(open("labels.json"))
-TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+if trt is not None:
+    TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 
 def allocate_buffers(model_engine):
@@ -102,6 +104,12 @@ def reward_fn_distri(predict, expected_accuracy):
 
 def main():
     USE_ONNX = True
+
+    if trt is None:
+        if not USE_ONNX:
+            print('tensorrt not available. falling back to onnxruntime')
+        USE_ONNX = True
+
     if USE_ONNX:
         print('Onnxruntime Device:', ort.get_device())
     K = 3
@@ -158,18 +166,19 @@ def main():
         count_itr += 1
         target_idx = agent.choose()
         target_model = k_models[target_idx]
+        out = None
         if USE_ONNX:
             out, ms = do_inference_onnx(store.model_engine[target_model], np.array(img, dtype=np.float32, order='C'))
         else:
             target_context = contexts[target_idx]
             inputs[0]["host"] = np.array(img, dtype=np.float32, order='C')
-            inputs[0]["host"] = np.array(img, dtype=np.float32, order='C')
             out, ms = do_inference(target_context, bindings,
                                inputs, outputs, stream)
 
         # Convert the 1000 dimension output to label
-        trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
-        label = trt_output.argmax(dim=0).numpy()
+        #trt_output = torch.nn.functional.softmax(torch.Tensor(out[0]), dim=0)
+        #label = trt_output.argmax(dim=0).numpy()
+        label = torch.argmax(torch.Tensor(out).squeeze(), axis=0)
         reward = reward_fn_feedback(int(label), int(gt))
         # reward = reward_fn_distri(label, omsi.expected_accuracy(target_model))
 
