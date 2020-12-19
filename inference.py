@@ -4,11 +4,14 @@ import collections
 import datetime
 import sys
 import warnings
-import tensorrt as trt
-import onnxruntime as ort
+try:
+    import tensorrt as trt
+    import pycuda
+    import pycuda.autoinit
+except ImportError:
+    trt = None
 
-import pycuda
-import pycuda.autoinit
+import onnxruntime as ort
 import torch
 import numpy as np
 
@@ -23,7 +26,8 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 # class_idx = json.load(open("labels.json"))
-TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+if trt is not None:
+    TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 
 def allocate_buffers(model_engine):
@@ -165,7 +169,8 @@ def main():
         contexts = [engine.create_execution_context() for engine in engines]
 
     profiler = profiling.Profiler(WINDOW_SIZE, FPS, omsi.model_cluster())
-    stream = pycuda.driver.Stream()
+    if not USE_ONNX:
+        stream = pycuda.driver.Stream()
     count_itr = 0
     start_t = time.perf_counter()
 
@@ -215,16 +220,19 @@ def main():
                 out, ms = do_inference(contexts[idx], bindings, inputs, outputs, stream)
             inference_ms += ms
             # Convert the 1000 dimension output to label
+            '''
             trt_output = torch.nn.functional.softmax(
                 torch.Tensor(out[0]), dim=0)
             output_np = trt_output.numpy()
+            '''
+            output_np = torch.Tensor(out).squeeze().numpy()
             if label_comb is None:
                 label_comb = weights[idx] * output_np
             else:
                 label_comb += weights[idx] * output_np
 
             # Update single model stat
-            label = trt_output.argmax(dim=0).numpy()
+            label = torch.argmax(torch.Tensor(out).squeeze(), axis=0)
             model_reward = metric.reward_fn_feedback(int(label), int(gt))
             agent.observe(target_model, model_reward)
             # Update chunk observe
